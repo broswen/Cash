@@ -13,7 +13,7 @@ module.exports.handler = async event => {
 
   if (id === undefined || id === null) {
     return {
-      statusCode: 403,
+      statusCode: 400,
       body: JSON.stringify(
         {
           message: "id property not found in request body"
