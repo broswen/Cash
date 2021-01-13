@@ -1,0 +1,47 @@
+service: cash
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+
+  stage: dev
+  region: us-east-1
+
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:PutItem"
+        - "dynamodb:GetItem"
+        - "dynamodb:DeleteItem"
+        - "dynamodb:UpdateItem"
+      Resource: 
+        - !GetAtt DataTable.Arn
+
+  environment:
+    DB: !Ref DataTable
+
+functions:
+  cash:
+    handler: Cash.handler
+    events:
+      - http:
+          path: cash
+          method: post
+
+resources:
+  Resources:
+    DataTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: CashDataTable
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: ID
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ID
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: TTL
+          Enabled: true
