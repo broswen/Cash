@@ -8,5 +8,12 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@middy/core": "^1.5.1",
+    "@middy/http-error-handler": "^1.5.1",
+    "@middy/http-json-body-parser": "^1.5.1",
+    "@middy/validator": "^1.5.1",
+    "http-errors": "^1.8.0"
+  }
 }

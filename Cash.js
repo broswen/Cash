@@ -2,27 +2,41 @@
 const AWS = require('aws-sdk');
 const DDB = new AWS.DynamoDB.DocumentClient();
 
-module.exports.handler = async event => {
+const middy = require('@middy/core');
+const jsonBodyParser = require('@middy/http-json-body-parser');
+const httpErrorHandler = require('@middy/http-error-handler');
+var createError = require('http-errors');
+const validator = require('@middy/validator');
 
-  const body = JSON.parse(event.body);
+const inputSchema = {
+  type: 'object',
+  properties: {
+    body: {
+      type: 'object',
+      required: ['id'],
+      properties: {
+        id: {type: 'string', minLength: 1},
+        cacheSettings: {
+          type: 'object',
+          properties: {
+            cache: {type: 'boolean'},
+            save: {type: 'boolean'},
+            TTL: {type: 'integer', minimum: 1}
+          }
+        }
+      }
+    }
+  }
+}
 
-  const {id} = body;
+const cash = async event => {
 
-  const {cacheSettings = {cache: true, TTL: 5, save: true} } = body;
+  const {id} = event.body;
+
+  const {cacheSettings = {cache: true, TTL: 5, save: true} } = event.body;
   const {cache = true, TTL = 5, save = true} = cacheSettings;
 
-  if (id === undefined || id === null) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify(
-        {
-          message: "id property not found in request body"
-        },
-      ),
-    };
-  }
-
-  let data;
+  let data = {};
   let fromCache = true;
 
   //if requested cache, check for value
@@ -36,6 +50,7 @@ module.exports.handler = async event => {
     fromCache = false;
     //simulate fetching data
     const KEY = new Date().toISOString();
+
     //calculate DDB TTL
     const calculatedTTL = (new Date().getTime()/1000) + TTL;
     //if save to cache
@@ -72,7 +87,13 @@ async function getData(id) {
       ID: `${id}`,
     },
   }; 
-  const data = await DDB.get(params).promise();
+  let data;
+  try {
+    data = await DDB.get(params).promise();
+  } catch (error) {
+    console.log(error);
+    throw createError.InternalServerError("DATABASE ERROR");
+  }
   return data;
 }
 
@@ -83,10 +104,21 @@ async function putData(id, key, TTL) {
       ID: `${id}`,
       KEY: key,
       TTL
-    },
-    ReturnValues: "ALL_OLD"
+    }
   };
 
-  const data = await DDB.put(params).promise();
+  try {
+    const data = await DDB.put(params).promise();
+  } catch (error) {
+    console.log(error);
+    throw createError.InternalServerError("DATABASE ERROR");
+  }
   return {Item: {ID: id, TTL, KEY: key}};
 }
+
+const handler = middy(cash)
+  .use(jsonBodyParser())
+  .use(validator({inputSchema}))
+  .use(httpErrorHandler());
+
+module.exports = { handler };
